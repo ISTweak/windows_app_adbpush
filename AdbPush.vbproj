@@ -75,6 +75,7 @@
     <Import Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="adb.vb" />
     <Compile Include="Form1.vb">
       <SubType>Form</SubType>
     </Compile>

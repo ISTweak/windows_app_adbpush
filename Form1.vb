@@ -3,17 +3,28 @@ Imports System.Diagnostics
 
 Public Class Form1
     Private getFiles() As String
+    Private adb As adb = New adb(AddressOf AddCmd_, AddressOf AddLog_)
 
-    Private PSI As New ProcessStartInfo()
-    Private P As New Process
+    Private Sub AddLog_(m As String)
+        If m <> "" Then
+            TextBox1.Text &= m & vbNewLine
+        End If
+    End Sub
 
-    Private Const cmdPush As String = "/c adb push ""{0}"" {1} "
-    Private Const cmdChmod As String = " && adb shell chmod {0} {1}/{2}"
+    Private Sub AddCmd_(m As String)
+        If m <> "" Then
+            TextBox2.Text &= m & vbNewLine
+        End If
+    End Sub
 
     Private Sub Form1_DragDrop(ByVal sender As Object, ByVal e As System.Windows.Forms.DragEventArgs) Handles Me.DragDrop
         getFiles = CType(e.Data.GetData(DataFormats.FileDrop), String())
 
         Me.Cursor = Cursors.WaitCursor
+
+        If adb.SerchProcess = False Then
+            adb.Start()
+        End If
 
         Select Case ComboBox3.SelectedIndex
             Case 0
@@ -95,9 +106,9 @@ Public Class Form1
         SetPushDirCMB()
         SetAnyCMB()
 
-        InitPSI()
-
-        runCommand("/c adb start-server", False)
+        If adb.SerchProcess = False Then
+            adb.Start()
+        End If
 
         If ArgCmd.Length > 0 Then
             ArgCmd = ArgCmd.Replace("""", "")
@@ -108,74 +119,18 @@ Public Class Form1
         End If
     End Sub
 
-    Private Sub InitPSI()
-        With PSI
-            .FileName = System.Environment.GetEnvironmentVariable("ComSpec")
-            .RedirectStandardInput = False
-            .RedirectStandardOutput = True
-            .UseShellExecute = False
-            .CreateNoWindow = True
-        End With
-    End Sub
-
     Private Sub adbpush()
         If ComboBox1.Text = "" Then
             MessageBox.Show("push先どこ？")
             Return
         End If
 
-        Dim cmd As String
-        For idx As Integer = 0 To getFiles.Length - 1
-            cmd = String.Format(cmdPush, getFiles(idx), ComboBox1.Text)
-            If ComboBox2.Text <> "" Then
-                cmd &= String.Format(cmdChmod, ComboBox2.Text, ComboBox1.Text, Path.GetFileName(getFiles(idx)))
-            End If
-
-            TextBox2.Text &= cmd & vbNewLine
-
-            If runCommand(cmd) Then
-                TextBox1.Text &= Path.GetFileName(getFiles(idx)) & "を転送しました。" & vbNewLine
-            End If
-        Next
+        adb.Push(getFiles, ComboBox1.Text, ComboBox2.Text)
     End Sub
 
     Private Sub install(Optional ByVal m As String = "")
-        Dim cmd As String
-        For idx As Integer = 0 To getFiles.Length - 1
-            cmd = "/c adb install " + m + """" + getFiles(idx) + """"
-            runCommand(cmd)
-        Next
+        adb.Install(getFiles, m)
     End Sub
-
-    Private Function runCommand(Cmd As String, Optional log As Boolean = True) As Boolean
-        PSI.Arguments = Cmd
-
-        P = Process.Start(PSI)
-        With P
-            If log Then
-                TextBox1.Text &= .StandardOutput.ReadToEnd
-            End If
-
-            If CheckBox1.Checked Then
-                .WaitForExit(10000)
-            Else
-                .WaitForExit()
-            End If
-
-            If .HasExited = False Then
-                If .Responding Then
-                    .Close()
-                Else
-                    .Kill()
-                End If
-
-                TextBox1.Text &= "タイムアウトしました。"
-                Return False
-            End If
-        End With
-
-        Return True
-    End Function
 
     Private Sub ComboBox3_SelectedIndexChanged(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles ComboBox3.SelectedIndexChanged
         Dim b As Boolean = (ComboBox3.SelectedIndex = 0)
